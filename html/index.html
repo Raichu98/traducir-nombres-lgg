@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traductor de Nombres</title>
+    <style>
+        body {
+            transition: background 0.3s, color 0.3s;
+        }
+        .dark-mode {
+            background-color: #1a1919;
+            color: rgb(223, 217, 217);
+        }
+        .dark-mode textarea {
+            background-color: #1e1e1e;
+            color: white;
+            border: 1px solid #444;
+        }
+        .clickable {
+            cursor: pointer;
+            color: rgb(109, 109, 250);
+            text-decoration: underline;
+            margin: 0 5px;
+        }
+        #question {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #copyButton {
+            margin-top: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #copyMessage {
+            margin-left: 10px;
+            color: green;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="toggleDarkMode()">Modo Nocturno</button>
+    <h2>Traductor de Nombres</h2>
+    <textarea id="inputText" placeholder="Ingresa un texto que contenga nombres en inglés" rows="4" cols="50"></textarea>
+    <div id="question"></div>
+    <p id="result"></p>
+    <button id="copyButton" onclick="copyTranslatedText()">Copiar texto traducido</button>
+    <span id="copyMessage">¡Texto copiado!</span>
+
+    <script src="translations_updated.js"></script>
+    <script>
+        document.getElementById("inputText").addEventListener("input", translateText);
+
+        // Objeto para almacenar las traducciones seleccionadas
+        let selectedTranslations = {};
+
+        function translateText() {
+            document.getElementById("question").innerHTML = ""; // Limpiar preguntas anteriores
+            let input = document.getElementById("inputText").value;
+            let paragraphs = input.split(/\n/); // Dividir el texto en párrafos
+            let translatedText = paragraphs.map((paragraph, pIndex) => {
+                let words = paragraph.split(/(<!--.*?-->|<small>.*?<\/small>|<br>|\b)/); // Dividir cada párrafo en palabras, <br>, <small> y comentarios
+                let translatedParagraph = words.map((word, index) => {
+                    // Si es un comentario HTML, escapar los caracteres para mostrarlo como texto
+                    if (/<!--.*?-->/.test(word)) {
+                        return word.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    }
+                    // Si es <small>, escapar los caracteres para mostrarlo como texto
+                    if (/<small>.*?<\/small>/.test(word)) {
+                        return word.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    }
+                    // Si es <br>, escapar los caracteres para mostrarlo como texto
+                    if (word.toLowerCase() === "<br>") {
+                        return "&lt;br&gt;";
+                    }
+                    // Si es una palabra traducible
+                    if (translations[word]) {
+                        // Si ya se seleccionó una traducción para esta palabra, usarla
+                        if (selectedTranslations[word]) {
+                            return `<span id='word-${pIndex}-${index}'>${selectedTranslations[word]}</span>`;
+                        }
+                        // Si hay múltiples opciones y no se ha preguntado antes
+                        else if (translations[word].length > 1) {
+                            askChoice(word, `${pIndex}-${index}`);
+                            return `<span id='word-${pIndex}-${index}'>${translations[word][0]}</span>`;
+                        }
+                        // Si solo hay una opción
+                        else {
+                            return `<span id='word-${pIndex}-${index}'>${translations[word][0]}</span>`;
+                        }
+                    }
+                    return word;
+                }).join("");
+                return translatedParagraph;
+            }).join("<br>"); // Unir los párrafos con <br> para mantener los saltos de línea
+
+            document.getElementById("result").innerHTML = translatedText;
+        }
+
+        function askChoice(word, id) {
+            let questionDiv = document.getElementById("question");
+            if (!document.getElementById(`question-${word}`)) {
+                let options = translations[word].map(option => 
+                    `<span class='clickable' onclick='setTranslation("${word}", "${option}")'>${option}</span>`
+                ).join(" o ");
+
+                let questionElement = document.createElement("p");
+                questionElement.id = `question-${word}`;
+                questionElement.innerHTML = `${word}: ¿Te refieres a ${options}?`;
+                questionDiv.appendChild(questionElement);
+            }
+        }
+
+        function setTranslation(word, choice) {
+            // Guardar la traducción seleccionada para la palabra
+            selectedTranslations[word] = choice;
+
+            // Actualizar todas las instancias de la palabra en el texto traducido
+            let spans = document.querySelectorAll(`span[id^='word-']`);
+            spans.forEach(span => {
+                if (span.innerText === word || translations[word].includes(span.innerText)) {
+                    span.innerText = choice;
+                }
+            });
+
+            // Eliminar la pregunta una vez seleccionada
+            let questionElement = document.getElementById(`question-${word}`);
+            if (questionElement) {
+                questionElement.remove();
+            }
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode");
+            let darkModeEnabled = document.body.classList.contains("dark-mode");
+            localStorage.setItem("darkMode", darkModeEnabled);
+        }
+
+        function copyTranslatedText() {
+            let translatedText = document.getElementById("result").innerText; // Obtener el texto traducido sin etiquetas HTML
+            navigator.clipboard.writeText(translatedText).then(() => {
+                // Mostrar mensaje de confirmación
+                let copyMessage = document.getElementById("copyMessage");
+                copyMessage.style.display = "inline";
+                setTimeout(() => {
+                    copyMessage.style.display = "none"; // Ocultar el mensaje después de 2 segundos
+                }, 2000);
+            }).catch(err => {
+                console.error("Error al copiar el texto: ", err);
+            });
+        }
+
+        window.onload = function() {
+            if (localStorage.getItem("darkMode") === "true") {
+                document.body.classList.add("dark-mode");
+            }
+        };
+    </script>
+</body>
+</html>
