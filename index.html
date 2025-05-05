@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -56,48 +58,60 @@
         // Objeto para almacenar las traducciones seleccionadas
         let selectedTranslations = {};
 
-        function translateText() {
-            document.getElementById("question").innerHTML = ""; // Limpiar preguntas anteriores
-            let input = document.getElementById("inputText").value;
-            let paragraphs = input.split(/\n/); // Dividir el texto en párrafos
-            let translatedText = paragraphs.map((paragraph, pIndex) => {
-                let words = paragraph.split(/(<!--.*?-->|<small>.*?<\/small>|<br>|\b)/); // Dividir cada párrafo en palabras, <br>, <small> y comentarios
-                let translatedParagraph = words.map((word, index) => {
-                    // Si es un comentario HTML, escapar los caracteres para mostrarlo como texto
-                    if (/<!--.*?-->/.test(word)) {
-                        return word.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    }
-                    // Si es <small>, escapar los caracteres para mostrarlo como texto
-                    if (/<small>.*?<\/small>/.test(word)) {
-                        return word.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    }
-                    // Si es <br>, escapar los caracteres para mostrarlo como texto
-                    if (word.toLowerCase() === "<br>") {
-                        return "&lt;br&gt;";
-                    }
-                    // Si es una palabra traducible
-                    if (translations[word]) {
-                        // Si ya se seleccionó una traducción para esta palabra, usarla
-                        if (selectedTranslations[word]) {
-                            return `<span id='word-${pIndex}-${index}'>${selectedTranslations[word]}</span>`;
-                        }
-                        // Si hay múltiples opciones y no se ha preguntado antes
-                        else if (translations[word].length > 1) {
-                            askChoice(word, `${pIndex}-${index}`);
-                            return `<span id='word-${pIndex}-${index}'>${translations[word][0]}</span>`;
-                        }
-                        // Si solo hay una opción
-                        else {
-                            return `<span id='word-${pIndex}-${index}'>${translations[word][0]}</span>`;
-                        }
-                    }
-                    return word;
-                }).join("");
-                return translatedParagraph;
-            }).join("<br>"); // Unir los párrafos con <br> para mantener los saltos de línea
+function translateText() {
+    document.getElementById("question").innerHTML = ""; // Limpiar preguntas anteriores
+    let input = document.getElementById("inputText").value;
 
-            document.getElementById("result").innerHTML = translatedText;
-        }
+    // Primero, traducir las frases compuestas (excepciones)
+    for (let phrase in compoundTranslations) {
+        let translation = selectedTranslations[phrase] || compoundTranslations[phrase][0];
+        let regex = new RegExp(`\\b${phrase}\\b`, "g");
+        input = input.replace(regex, `<compound>${phrase}</compound>`);
+    }
+
+    let paragraphs = input.split(/\n/); // Dividir el texto en párrafos
+    let translatedText = paragraphs.map((paragraph, pIndex) => {
+        let words = paragraph.split(/(<!--.*?-->|<small>.*?<\/small>|<br>|\b|<compound>.*?<\/compound>)/);
+        let translatedParagraph = words.map((word, index) => {
+            if (word.startsWith("<compound>")) {
+                let original = word.replace(/<\/?compound>/g, "");
+                if (!selectedTranslations[original] && compoundTranslations[original].length > 1) {
+                    askChoice(original, `${pIndex}-${index}`);
+                }
+                return `<span id='word-${pIndex}-${index}'>${selectedTranslations[original] || compoundTranslations[original][0]}</span>`;
+            }
+
+            if (/<!--.*?-->/.test(word)) {
+                return word.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+
+            if (/<small>.*?<\/small>/.test(word)) {
+                return word.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+
+            if (word.toLowerCase() === "<br>") {
+                return "&lt;br&gt;";
+            }
+
+            if (translations[word]) {
+                if (selectedTranslations[word]) {
+                    return `<span id='word-${pIndex}-${index}'>${selectedTranslations[word]}</span>`;
+                } else if (translations[word].length > 1) {
+                    askChoice(word, `${pIndex}-${index}`);
+                    return `<span id='word-${pIndex}-${index}'>${translations[word][0]}</span>`;
+                } else {
+                    return `<span id='word-${pIndex}-${index}'>${translations[word][0]}</span>`;
+                }
+            }
+
+            return word;
+        }).join("");
+        return translatedParagraph;
+    }).join("<br>");
+
+    document.getElementById("result").innerHTML = translatedText;
+}
+
 
         function askChoice(word, id) {
             let questionDiv = document.getElementById("question");
